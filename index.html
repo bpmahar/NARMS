@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <link rel="manifest" href="manifest.json">
+
+
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Reporting</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b63ce, #eef2f7);
+      padding: 12px;
+    }
+    .card {
+      background: #fff; max-width: 860px; margin: auto;
+      padding: 16px; border-radius: 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    h3 { text-align:center; color:#0b63ce; margin: 8px 0 2px; }
+    h4 { margin: 6px 0 4px; color: #0b63ce; }
+    label { font-size:13px; font-weight:600; margin-top:10px; display:block; }
+    input, select, textarea, button {
+      width:100%; padding:11px; margin-top:6px;
+      font-size:16px; /* prevent iOS zoom */
+      border-radius:10px; border:1px solid #ccc;
+    }
+    textarea { min-height:80px; }
+    button {
+      background:#0b63ce; color:#fff; border:none;
+      font-weight:600; font-size:16px; border-radius:12px;
+      margin-top:12px; cursor:pointer;
+      padding:12px;
+    }
+    button.secondary { background:#6b7280; }
+    button:disabled { background:#9bb7e0; cursor:not-allowed; }
+    .grid { display:grid; grid-template-columns:1fr; gap:10px; }
+    .grid-4 { display:grid; grid-template-columns:1fr; gap:10px; }
+    .section { margin-top:18px; padding-top:6px; border-top:1px solid #eee; }
+    .hidden { display:none; }
+
+    .table-responsive { /* mobile friendly tables */
+      width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+    th, td { border:1px solid #ddd; padding:6px; white-space: nowrap; }
+    #preview { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    #preview img { width:70px; height:70px; object-fit:cover; border-radius:8px; border:1px solid #ccc; }
+
+    @media (min-width:768px) {
+      .grid   { grid-template-columns:repeat(3,1fr); }
+      .grid-4 { grid-template-columns:1.2fr 1.4fr 1.8fr 0.8fr; }
+    }
+
+    /* ---- Centered Toast ---- */
+    #toast {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.96);
+      min-width: 280px; max-width: 90vw;
+      background: #0b63ce; color: #fff; padding: 14px 18px;
+      border-radius: 12px; font-size: 15px; line-height: 1.35;
+      box-shadow: 0 14px 40px rgba(0,0,0,.35);
+      opacity: 0; pointer-events: none;
+      transition: opacity .22s ease, transform .22s ease;
+      z-index: 9999; text-align: center;
+    }
+    #toast.show   { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+    #toast.success{ background:#198754; }
+    #toast.error  { background:#dc3545; }
+
+    #toast-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.35);
+      opacity: 0; pointer-events: none; transition: opacity .22s ease; z-index: 9998;
+    }
+    #toast-backdrop.show { opacity: 1; pointer-events: auto; }
+
+    /* Invalid input highlight */
+    .input-invalid { border-color: #dc3545 !important; background: #ffecec !important; outline: none; }
+    .input-invalid:focus { box-shadow: 0 0 0 3px rgba(220,53,69,0.15); }
+
+    @media (max-width: 380px) {
+      #toast { min-width: 240px; font-size: 14px; padding: 12px 14px; }
+    }
+
+    /* ===== Buttons row (view activities) ===== */
+    .actions-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      border-top: 1px solid #eee;
+      padding-top: 6px;
+      margin-top: 18px;
+    }
+    .actions-row button {
+      width: auto;         /* override global 100% */
+      flex: 1 1 0;
+      margin-top: 0;
+      white-space: nowrap;
+    }
+    @media (max-width: 420px) {
+      .actions-row { flex-wrap: wrap; }
+      .actions-row button { flex: 1 1 100%; }
+    }
+
+    /* ===== Activities Modal ===== */
+    .modal {
+      position: fixed; inset: 0; z-index: 9997;
+      background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal.hidden { display: none; }
+    .modal-card {
+      width: min(900px, 94vw); max-height: 86vh; overflow: auto;
+      background: #fff; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+      padding: 12px 12px 16px;
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      border-bottom: 1px solid #eee; padding: 6px 4px 10px; margin-bottom: 10px;
+    }
+    .icon-btn {
+      background: transparent; color:#111; border: 1px solid #ddd; border-radius: 8px;
+      padding: 6px 9px; cursor: pointer; font-weight: 600;
+    }
+    .icon-btn:hover { background:#f5f6f8; }
+    .activities-toolbar {
+      display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;
+    }
+    .activities-count { font-size: 13px; color:#374151; }
+    .activities-table-wrap { width:100%; overflow:auto; }
+    .activities-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .activities-table th, .activities-table td {
+      border:1px solid #e5e7eb; padding:6px; white-space: nowrap;
+    }
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600;
+      background:#eef2ff; color:#3730a3;
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #eee, #f5f5f5, #eee);
+      background-size: 200% 100%;
+      animation: shine 1s linear infinite;
+      height: 16px; border-radius: 6px;
+    }
+    @keyframes shine { from { background-position: 200% 0;} to { background-position: -200% 0;} }
+  </style>
+</head>
+
+<body>
+<div class="card">
+  <h3>Activity Reporting</h3>
+
+  <!-- BASIC DETAILS -->
+  <div class="grid">
+    <div>
+      <label>Date of Event *</label>
+      <input type="date" id="eventDate" name="Date of Event" required>
+    </div>
+    <div>
+      <label>FSO Location *</label>
+      <!-- FIXED: added () -->
+      <select id="fsoLocation" name="FSO LOCATION" required onchange="loadTeam()">
+        <option value="">Select</option>
+      </select>
+    </div>
+    <div>
+      <label>FSO / CRE ID &amp; Name *</label>
+      <select id="teamMember" name="CRE ID &amp; Name" required>
+        <option value="">Select</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- EVENT DETAILS -->
+  <div class="section grid-4">
+    <div>
+      <label>Location of Event *</label>
+      <input name="Location of Event" maxlength="25" required>
+    </div>
+    <div>
+      <label>Type of Activity *</label>
+      <select id="typeActivity" name="Type of Activity" required onchange="onTypeChange()">
+        <option value="">Select</option>
+        <option>Customer Engagment Program</option>
+        <option>Dealer/RO Staff Engagement Program</option>
+        <option>Swatchta Related Activity</option>
+        <option>CRE/FSO Training/Other Activity</option>
+      </select>
+    </div>
+    <div id="activityCol" class="hidden">
+      <label>Name of Activity *</label>
+      <select id="nameActivity" name="Name of Activity" required onchange="onNameChange()">
+        <option value="">Select</option>
+      </select>
+    </div>
+    <div>
+      <label>Nos. of Participants *</label>
+      <input type="number" id="nop" name="Nos. of Participants" min="0" step="1" required onchange="buildParticipantTable()">
+    </div>
+  </div>
+
+  <!-- BRIEF -->
+  <div class="section">
+    <label>Short Briefing about activity *</label>
+    <textarea name="Short Briefing about activity" required></textarea>
+  </div>
+
+  <!-- PARTICIPANTS -->
+  <div id="participantBlock" class="section hidden">
+    <h4>Participant Details</h4>
+    <div class="table-responsive">
+      <table>
+        <thead><tr id="participantHeader"></tr></thead>
+        <tbody id="participantBody"></tbody>
+      </table>
+    </div>
+    <div id="participantNote" style="font-size:12px;color:#6b7280;margin-top:6px;display:none;"></div>
+  </div>
+
+  <!-- RO Mini Table -->
+  <div id="roMiniBlock" class="section hidden">
+    <h4>RO Details</h4>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>SAP CODE</th>
+            <th>NAME OF RO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <input id="roMiniSap" name="SAP CODE" placeholder="6-digit" maxlength="6" inputmode="numeric" aria-label="SAP CODE (6 digits)" required oninput="enforceSixDigitSap(this)">
+            </td>
+            <td>
+              <input id="roMiniName" name="NAME OF RO" placeholder="RO Name" aria-label="Name of RO" required>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:#6b7280;margin-top:6px;">
+      Note: SAP CODE must be exactly 6 digits.
+    </div>
+  </div>
+
+  <!-- PHOTOS (MANDATORY) -->
+  <div class="section">
+    <label>Upload Photos (Max 3, ≤ 10 MB each) <span style="color:#dc3545">*</span></label>
+    <input type="file" id="photos" accept="image/*" multiple required>
+    <div id="preview"></div>
+  </div>
+
+  <button id="submitBtn" onclick="submitForm()">Submit Activity</button>
+  <button class="secondary hidden" onclick="loadLast()">Edit Last Submission</button>
+
+  <!-- View activities buttons in one row -->
+  <div class="actions-row">
+    <button class="secondary" onclick="loadMyActivities('MONTH')">
+      View my recent activities (Current Month)
+    </button>
+    <button class="secondary" onclick="loadMyActivities('YEAR')">
+      View my all activities (This Year)
+    </button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="toast-backdrop" aria-hidden="true"></div>
+
+<!-- Activities Modal -->
+<div id="activitiesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="activitiesTitle">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h4 id="activitiesTitle">My Activities</h4>
+      <button class="icon-btn" onclick="closeActivitiesModal()" aria-label="Close">✕</button>
+    </div>
+    <div id="activitiesBody"></div>
+  </div>
+</div>
+
+<script>
+  /* ===== INIT DATE (Max 5 days old, no future) ===== */
+  (function initEventDate(){
+    const dateInput = document.getElementById('eventDate');
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const minDate = new Date();
+    minDate.setDate(today.getDate() - 5);
+    const minDateStr = minDate.toISOString().split('T')[0];
+    dateInput.value = todayStr; dateInput.max = todayStr; dateInput.min = minDateStr;
+  })();
+
+  eventDate.addEventListener('change', () => {
+    const selected = new Date(eventDate.value);
+    const today = new Date();
+    const min = new Date();
+    min.setDate(today.getDate() - 5);
+    if (selected > today || selected < min) {
+      showToast('Only last 5 days date is allowed', 'error');
+      eventDate.value = today.toISOString().split('T')[0];
+    }
+  });
+
+  /* ===================== TEAM MAP ===================== */
+  const TEAM_BY_LOCATION = {
+    "AMBALA":[{"id":"CN1002","name":"SHANKAR"},{"id":"CN1003","name":"VANSHDEEP"},{"id":"CN1004","name":"VINOD KUMAR"},{"id":"CN1005","name":"SHUBHAM RAJ"},{"id":"FN1000","name":"JOSHUA WOOD"}],
+    "BATHINDA":[{"id":"CN0702","name":"VARUN SHARMA"},{"id":"CN0703","name":"DEEPAK VERMA"},{"id":"CN0704","name":"RAMAN"},{"id":"CN0705","name":"VIKAS KUMAR"},{"id":"FN0700","name":"KUSH GUPTA"}],
+    "CHANDIGARH":[{"id":"CN1006","name":"KAMAL DEEP SINGH"},{"id":"CN1501","name":"ROHIT KUMAR"},{"id":"CN1502","name":"ABHIKARAN"},{"id":"FN1500","name":"SHER SINGH"}],
+    "DELHI":[{"id":"CN0201","name":"MOHAMMAD DILSHAD"},{"id":"CN0202","name":"GAURAV"},{"id":"CN0203","name":"Rahul Patwal"},{"id":"CN0204","name":"TIPU  SULTAN"},{"id":"FN0200","name":"SWATI VERMA"}],
+    "GHAZIABAD":[{"id":"CN0902","name":"SONU UPADHAYAY"},{"id":"CN0903","name":"SHARAD KUMAR GUPTA"},{"id":"CN0904","name":"ASIF ALVI"},{"id":"CN1301","name":"LAXMAN SINGH"},{"id":"CN1302","name":"Ravi Pratap Singh"},{"id":"CN1303","name":"SAMEER KHAN"},{"id":"FN0900","name":"SATYABHAN SINGH"}],
+    "GURGAON":[{"id":"CN0101","name":"DEVENDER SHARMA"},{"id":"CN0102","name":"CHANDER JEET"},{"id":"CN0103","name":"RAJESH KUMAR SAINI"},{"id":"CN0104","name":"RAKESH KUMAR"},{"id":"CN0105","name":"SANDEEP KUMAR"},{"id":"CN0106","name":"RAVI DUTT"},{"id":"FN0100","name":"SHINGARA SINGH"}],
+    "JAIPUR":[{"id":"CN0301","name":"SANJAY KUMAR"},{"id":"CN0302","name":"GAJENDRA SINGH"},{"id":"CN0303","name":"DEENDAYAL VERMA"},{"id":"CN0304","name":"SUBHASH KUMAR"},{"id":"CN0305","name":"ASHOK KUMAR"},{"id":"CN0306","name":"UMED SEN"},{"id":"FN0300","name":"ANUJ GUPTA"}],
+    "JALANDHAR":[{"id":"CN0601","name":"PRAVEEN SINGH"},{"id":"CN0602","name":"ABRAR"},{"id":"CN0603","name":"ROHIT TARA"},{"id":"CN0604","name":"RAJAN SINGH"},{"id":"CN0605","name":"VIKAS RAWAT"},{"id":"CN0607","name":"AJAY KUMAR"},{"id":"FN0600","name":"B P MEENA"}],
+    "JODHPUR":[{"id":"CN1401","name":"-"},{"id":"CN1402","name":"Sohan Lal"},{"id":"CN1403","name":"SURESH GOYAL"},{"id":"CN1404","name":"Bhallaram Choudhary"},{"id":"FN1400","name":"RISHABH KUMAR"}],
+    "KANPUR":[{"id":"CN0401","name":"Nipun Yadav"},{"id":"CN0404","name":"ABHISHEK SINGH"},{"id":"CN0405","name":"DEEPAK SHARMA"},{"id":"CN0406","name":"VINAY KASHYAP"},{"id":"CN0408","name":"CRE PRAYAGRAJ"},{"id":"CN0409","name":"Mr. Vivek Pandey"},{"id":"FN0400","name":"ASHISH KUMAR SAINI"}],
+    "KOTA":[{"id":"CN1101","name":"NIRMAL KUMAR"},{"id":"CN1102","name":"Amar Singh Naruka"},{"id":"CN1103","name":"DAULAT SINGH RAJPUT"},{"id":"FN1100","name":"JAGDISH CHAND TIWARI"}],
+    "LUCKNOW":[{"id":"CN0901","name":"NITIN PRATAP"},{"id":"CN1601","name":"RAM GOPAL CHAUDHARY"},{"id":"CN1602","name":"BRIJESH KUMAR"},{"id":"CN1603","name":"RAJESH KUMAR GUpta"},{"id":"FN1600","name":"MD MOUZZAM ALI"}],
+    "RUDRAPUR":[{"id":"CN1201","name":"SAWEJ KHAN"},{"id":"CN1202","name":"GOPAL SINGH"},{"id":"CN1203","name":"RIZWAN KHAN"},{"id":"CN1204","name":"Hasnan"},{"id":"FN1200","name":"RIZWAN KHAN"}],
+    "UDAIPUR":[{"id":"CN0501","name":"HIMMAT SINGH"},{"id":"CN0502","name":"PUNEET SHARMA"},{"id":"CN0503","name":"NARENDRA MEENA"},{"id":"CN0504","name":"VIKRAM SINGH"},{"id":"CN0505","name":"DEEP SINGH"},{"id":"FN0500","name":"GAURAV DWIVEDI"}],
+    "VARANASI":[{"id":"CN0801","name":"HARENDER KUMAR"},{"id":"CN0803","name":"AVINASH MISHRA"},{"id":"CN0804","name":"RAVI MISHRA"},{"id":"CN0806","name":"MANISH VERMA"},{"id":"CN0807","name":"ABHISHEK SINGH"},{"id":"FN0800","name":"SHYAM SUNDER"}]
+  };
+
+  /* ===================== ACTIVITIES MAP ===================== */
+  const ACTIVITIES_BY_TYPE = {
+    'CRE/FSO Training/Other Activity': [
+      'Refreshing Knowledge about Sales Force',
+      'Refreshing Knowledge on ALP',
+      'CRE/FSO Training/Other Activity',
+      'Any Other'
+    ],
+    'Customer Engagment Program': [
+      'CHAI PE CHARCHA',
+      'Customer Education Program - ALP',
+      'Dhaba / Unions Adoption - SmartFleet Branding',
+      'Enrollment Camp',
+      'Free Medical Health Checkup Camp',
+      'Ghar Utsav Activities (Oct 2025)',
+      'Meet & Greet - Festivity',
+      'Meet & Greet Campaign',
+      'Mega customer / Transport meet (A Group of >=40 customers)',
+      'Mission 500 - Customer Acquisition Drive',
+      'Quarterly Night Out at OSTS',
+      'SDCV Customer meet',
+      'VC with High end customers',
+      'Any Special Drive by Group'
+    ],
+    'Dealer/RO Staff Engagement Program': [
+      'DSM/MANAGER/DEALER TRAINING',
+      'Dealer Penal Meet',
+      'Free Medical Camp',
+      'Ghar Utsav Activities (Oct 2025)',
+      'Kisan Mela',
+      'Quarterly NH Stretch meeting',
+      'Any Other Activity'
+    ],
+    'Swatchta Related Activity': [
+      'Cleanliness Drives',
+      'Competition (Slogan / Painting / Essay /Quiz / Play / Skits / Debate etc.)',
+      'Distribution of Hygiene / Swachhata Kit',
+      'Distribution of Nutrition Kit',
+      'Dustbin Installation',
+      'Health Camps',
+      'Iconic Places - Cleanliness drives',
+      'Information Education Communication (IEC) / Awareness Program',
+      'Installation of Hygiene / Waste Management Assets (RO Drinking Water, Sanitary Vending & Incinerator, Solar Light, Plastic Crusher, etc.)',
+      'Nukkad Natak',
+      'Prabhat Pheri / Walkathon / Cyclothon',
+      'Swachhata Thematic Wall Painting',
+      'Swatchta Pledge',
+      'Tree Plantation Drive',
+      'Any Other Activity in Swatchta Pakhwada'
+    ],
+    'Customer Engagement Program': null,
+    'Swachhta Related Activity': null
+  };
+
+  /* ================= Participant Table Schema (DISPLAY) ================= */
+  const SCHEMA_BY_ACTIVITY = {
+    'CHAI PE CHARCHA': [
+      'Name','Contact No.','Tpt Name','Tpt Contact No.','Tpt City','Total Vehicles','Total Potential KLPM','Remarks'
+    ],
+    'Customer Education Program - ALP': ['Name','Contact No.','Tpt Name','Remarks'],
+    'Meet & Greet - Festivity': ['Name','Contact No.','Tpt Name','Remarks'],
+    'Meet & Greet Campaign': ['Name','Contact No.','Tpt Name','Remarks'],
+    'VC with High end customers': ['Name','Contact No.','Tpt Name','Remarks'],
+    'DSM/MANAGER/DEALER TRAINING': ['Name','Contact No.','SAP CODE','NAME OF RO','Remarks']
+  };
+
+  /* ===== SHEET HEADER MAP (UI -> Sheet Header) ===== */
+  const SHEET_HEADER_MAP = { 'Name': 'Name of Participants' };
+
+  /* ========== Toast helper ========== */
+  function showToast(message, type='success', duration=2500){
+    const el = document.getElementById('toast');
+    const bd = document.getElementById('toast-backdrop');
+    el.className = '';
+    el.textContent = message;
+    el.classList.add(type === 'error' ? 'error' : 'success', 'show');
+    if (bd) bd.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => { el.classList.remove('show'); if (bd) bd.classList.remove('show'); }, duration);
+  }
+
+  /* ===== Populate locations & team ===== */
+  function populateLocations(){
+    const locSel = document.getElementById('fsoLocation');
+    locSel.innerHTML = '<option value="">Select</option>'; // ensure clean slate
+    const locations = Object.keys(TEAM_BY_LOCATION).sort();
+    locations.forEach(loc => locSel.insertAdjacentHTML('beforeend', `<option value="${loc}">${loc}</option>`));
+  }
+
+  function loadTeam(){
+    const loc = document.getElementById('fsoLocation').value;
+    const tm = document.getElementById('teamMember');
+    tm.innerHTML = '<option value="">Select</option>';
+    (TEAM_BY_LOCATION[loc] || []).forEach(m => {
+      tm.insertAdjacentHTML('beforeend', `<option value="${m.id} - ${m.name}">${m.id} - ${m.name}</option>`);
+    });
+  }
+
+  /* ===== SAP (6-digit) enforcer ===== */
+  function enforceSixDigitSap(el){
+    const v = (el.value || '').replace(/\D/g, '').slice(0, 6);
+    el.value = v;
+  }
+
+  /* ===== Activity change ===== */
+  function onTypeChange(){
+    const typeSel = document.getElementById('typeActivity');
+    const nameSel = document.getElementById('nameActivity');
+    const actCol  = document.getElementById('activityCol');
+
+    const type  = typeSel.value;
+    const names = ACTIVITIES_BY_TYPE[type] || [];
+
+    actCol.classList.toggle('hidden', !names || names.length === 0);
+    nameSel.innerHTML = '<option value="">Select</option>';
+    (names || []).forEach(n => nameSel.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`));
+    nameSel.required = names && names.length > 0;
+
+    updateParticipantVisibility();
+    updateRoMiniVisibility();
+  }
+  function onNameChange(){
+    updateParticipantVisibility();
+    updateRoMiniVisibility();
+    buildParticipantTable();
+  }
+
+  /* ===== Participant visibility ===== */
+  function isParticipantAllowed(){
+    const nameVal = (document.getElementById('nameActivity').value || '').trim();
+    return !!SCHEMA_BY_ACTIVITY[nameVal];
+  }
+  function updateParticipantVisibility(){
+    const block = document.getElementById('participantBlock');
+    const body  = document.getElementById('participantBody');
+    if (isParticipantAllowed()) block.classList.remove('hidden');
+    else { block.classList.add('hidden'); body.innerHTML = ''; }
+  }
+
+  /* ===== RO Mini visibility ===== */
+  function updateRoMiniVisibility(){
+    const typeVal = (document.getElementById('typeActivity').value || '').trim();
+    const nameVal = (document.getElementById('nameActivity').value || '').trim();
+    const show = (typeVal === 'Dealer/RO Staff Engagement Program') && nameVal && !SCHEMA_BY_ACTIVITY[nameVal];
+    const blk = document.getElementById('roMiniBlock');
+    blk.classList.toggle('hidden', !show);
+  }
+
+  /* ===== Build table ===== */
+  function buildParticipantHeader(cols){
+    const header = document.getElementById('participantHeader');
+    header.innerHTML = '';
+    (cols || []).forEach(c => header.insertAdjacentHTML('beforeend', `<th>${c}</th>`));
+  }
+  function buildParticipantTable(){
+    const nameVal = (document.getElementById('nameActivity').value || '').trim();
+    const cols    = SCHEMA_BY_ACTIVITY[nameVal];
+    const count   = Number(document.getElementById('nop').value || 0);
+    const block   = document.getElementById('participantBlock');
+    const body    = document.getElementById('participantBody');
+    const note    = document.getElementById('participantNote');
+
+    body.innerHTML = '';
+    if (!cols || count <= 0) { block.classList.add('hidden'); if (note) note.style.display='none'; return; }
+    block.classList.remove('hidden');
+
+    buildParticipantHeader(cols);
+
+    const requiredRows = Math.ceil(count * 0.60);
+    if (note) {
+      note.textContent = `Note: First ${requiredRows} rows require Name and Contact No. Remaining rows are optional.`;
+      note.style.display = 'block';
+    }
+
+    for (let i = 0; i < count; i++) {
+      let row = '<tr>';
+      (cols || []).forEach(col => {
+        let attrs = `data-col="${col}"`;
+        let ph = ''; let extra = '';
+        if (col.toLowerCase().includes('contact')) {
+          extra = ' maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\\D/g, \'\').slice(0,10)"';
+          ph = '10-digit';
+        }
+        if (col === 'Total Vehicles') { extra = ' inputmode="numeric"'; ph = 'e.g. 10'; }
+        if (col === 'Total Potential KLPM') { extra = ' inputmode="decimal"'; ph = 'e.g. 12.5'; }
+        if (col === 'SAP CODE') { extra = ' maxlength="6" inputmode="numeric" oninput="enforceSixDigitSap(this)"'; ph = '6-digit'; }
+        if (col === 'Fueling from') { ph = 'Source'; }
+        if (col.toLowerCase().includes('city')) { ph = 'City'; }
+        if (col.toLowerCase().startsWith('name')) { ph = 'Name'; }
+        row += `<td><input ${attrs} placeholder="${ph}"${extra}></td>`;
+      });
+      row += '</tr>';
+      body.insertAdjacentHTML('beforeend', row);
+    }
+  }
+
+  /* ===== Photo preview checks ===== */
+  photos.onchange = () => {
+    const preview = document.getElementById('preview');
+    preview.innerHTML = '';
+    const fList = [...photos.files];
+    if (fList.length === 0) { showToast('At least 1 photo is required', 'error'); return; }
+    if (fList.length > 3) { showToast('Maximum 3 photos allowed', 'error'); photos.value=''; return; }
+    for (const f of fList) {
+      if (f.size > 10 * 1024 * 1024) { showToast('Each photo must be ≤ 10 MB', 'error'); photos.value=''; preview.innerHTML=''; return; }
+      const img = document.createElement('img'); img.src = URL.createObjectURL(f); preview.appendChild(img);
+    }
+  };
+
+  /* ===== Core validations ===== */
+  function validateCoreFields(){
+    const clear = el => { if(!el) return; el.classList.remove('input-invalid'); el.removeAttribute('aria-invalid'); };
+    clear(document.getElementById('fsoLocation'));
+    clear(document.getElementById('teamMember'));
+    clear(document.querySelector('input[name="Location of Event"]'));
+    clear(document.querySelector('textarea[name="Short Briefing about activity"]'));
+    let firstInvalid = null;
+
+    const markInvalid = el => { if(!el) return; el.classList.add('input-invalid'); el.setAttribute('aria-invalid','true'); if(!firstInvalid) firstInvalid = el; };
+
+    const fso = document.getElementById('fsoLocation');
+    const mem = document.getElementById('teamMember');
+    const loc = document.querySelector('input[name="Location of Event"]');
+    const brief = document.querySelector('textarea[name="Short Briefing about activity"]');
+
+    if (!fso?.value) markInvalid(fso);
+    if (!mem?.value) markInvalid(mem);
+    if (!loc?.value?.trim()) markInvalid(loc);
+    if (!brief?.value?.trim()) markInvalid(brief);
+
+    if (firstInvalid){
+      firstInvalid.scrollIntoView({ behavior:'smooth', block:'center' });
+      setTimeout(() => { try{ firstInvalid.focus({ preventScroll:true }); }catch(e){} }, 220);
+      showToast('Please fill required fields: FSO Location, FSO/CRE, Location of Event, Short Briefing.', 'error', 4000);
+      return { ok:false };
+    }
+    return { ok:true };
+  }
+
+  /* ===== Duplicate rows (Name+Contact) not allowed ===== */
+  function validateNoDuplicateRows(){
+    if (!isParticipantAllowed()) return { ok:true };
+    const nameVal = (document.getElementById('nameActivity').value || '').trim();
+    const cols = SCHEMA_BY_ACTIVITY[nameVal] || [];
+    const idxName = cols.findIndex(c => c.toLowerCase().startsWith('name'));
+    const idxContact = cols.findIndex(c => c.toLowerCase().includes('contact no'));
+    if (idxName < 0 || idxContact < 0) return { ok:true };
+
+    document.querySelectorAll('#participantBody input').forEach(inp => {
+      inp.classList.remove('input-invalid'); inp.removeAttribute('aria-invalid');
+    });
+
+    const rows = Array.from(document.querySelectorAll('#participantBody tr'));
+    const map = new Map();
+    let dupInfo = null;
+
+    rows.forEach((tr, i) => {
+      const inputs = tr.querySelectorAll('input');
+      const nm = (inputs[idxName]?.value || '').trim().toLowerCase().replace(/\s+/g,' ');
+      const cn = (inputs[idxContact]?.value || '').replace(/\D/g,'').slice(0,10);
+      inputs[idxContact] && (inputs[idxContact].value = cn);
+
+      if (nm && cn.length === 10){
+        const key = nm + '|' + cn;
+        if (map.has(key) && !dupInfo) {
+          const prev = map.get(key);
+          [prev.inputs[idxName], prev.inputs[idxContact], inputs[idxName], inputs[idxContact]].forEach(el=>{
+            if (el){ el.classList.add('input-invalid'); el.setAttribute('aria-invalid','true'); }
+          });
+          dupInfo = { r1: prev.row+1, r2: i+1 };
+        } else {
+          map.set(key, { row: i, inputs });
+        }
+      }
+    });
+
+    if (dupInfo){
+      showToast(`Duplicate participant in rows ${dupInfo.r1} & ${dupInfo.r2}. Name + Contact must be unique.`, 'error', 4500);
+      return { ok:false };
+    }
+    return { ok:true };
+  }
+
+  /* ===== 80% mandatory (Name + Contact) ===== */
+  function validateParticipants60() {
+    if (!isParticipantAllowed()) return { ok: true };
+    const count = Number(document.getElementById('nop').value || 0);
+    if (count <= 0) return { ok: true };
+
+    document.querySelectorAll('#participantBody input').forEach(inp => { inp.classList.remove('input-invalid'); inp.removeAttribute('aria-invalid'); });
+
+    const rows = Array.from(document.querySelectorAll('#participantBody tr'));
+    const requiredRows = Math.ceil(rows.length * 0.80);
+    let firstInvalid = null;
+
+    const nameVal = (document.getElementById('nameActivity').value || '').trim();
+    const cols = SCHEMA_BY_ACTIVITY[nameVal] || [];
+
+    const idxName = cols.findIndex(c => c.toLowerCase().startsWith('name'));
+    const idxContact = cols.findIndex(c => c.toLowerCase().includes('contact no'));
+
+    for (let i = 0; i < requiredRows; i++) {
+      const inputs = rows[i].querySelectorAll('input');
+      const nameOk = idxName >= 0 ? (inputs[idxName]?.value || '').trim().length > 0 : true;
+      const contactVal = idxContact >= 0 ? ((inputs[idxContact]?.value) || '').replace(/\D/g,'').slice(0,10) : '';
+      if (idxContact >= 0) inputs[idxContact].value = contactVal;
+      const contactOk = idxContact >= 0 ? /^\d{10}$/.test(contactVal) : true;
+
+      if (!nameOk || !contactOk) {
+        if (!nameOk && idxName >= 0 && inputs[idxName]) { inputs[idxName].classList.add('input-invalid'); inputs[idxName].setAttribute('aria-invalid','true'); if (!firstInvalid) firstInvalid = inputs[idxName]; }
+        if (!contactOk && idxContact >= 0 && inputs[idxContact]) { inputs[idxContact].classList.add('input-invalid'); inputs[idxContact].setAttribute('aria-invalid','true'); if (!firstInvalid) firstInvalid = inputs[idxContact]; }
+      }
+    }
+
+    if (firstInvalid) {
+      firstInvalid.scrollIntoView({ behavior:'smooth', block:'center' });
+      setTimeout(() => { try { firstInvalid.focus({ preventScroll:true }); } catch(e){} }, 220);
+      showToast(`Please fill Name and 10-digit Contact No. in first ${requiredRows} rows.`, 'error', 4500);
+      return { ok:false, requiredRows };
+    }
+    return { ok:true, requiredRows };
+  }
+
+  /* ===== Helpers: SHA-256 ===== */
+  async function sha256HexFromString(str){
+    const enc = new TextEncoder().encode(str);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  async function sha256HexFromFile(file){
+    const buf = await file.arrayBuffer();
+    const dig = await crypto.subtle.digest('SHA-256', buf);
+    return [...new Uint8Array(dig)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function normalizeCell(s){ return (s || '').toString().trim().replace(/\s+/g,' '); }
+
+  async function buildParticipantsSignature(){
+    const nameVal = (document.getElementById('nameActivity').value || '').trim();
+    const cols = SCHEMA_BY_ACTIVITY[nameVal] || [];
+    const idxName = cols.findIndex(c => c.toLowerCase().startsWith('name'));
+    const idxContact = cols.findIndex(c => c.toLowerCase().includes('contact no'));
+
+    const rows = Array.from(document.querySelectorAll('#participantBody tr'));
+    const pairs = rows.map(tr => {
+      const inputs = Array.from(tr.querySelectorAll('input'));
+      const nm = idxName    >= 0 ? normalizeCell(inputs[idxName]?.value)    : '';
+      const cn = idxContact >= 0 ? normalizeCell((inputs[idxContact]?.value || '').replace(/\D/g,'').slice(0,10)) : '';
+      return (nm + '||' + cn);
+    });
+    const flattened = pairs.join('\n').toLowerCase();
+    return await sha256HexFromString(flattened);
+  }
+
+  function resetAll(){
+    document.querySelectorAll('input, select, textarea').forEach(el=>{
+      if (el.type === 'file') { el.value=''; return; }
+      if (el.id === 'eventDate') return;
+      if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value='';
+    });
+    document.getElementById('preview').innerHTML = '';
+    document.getElementById('participantHeader').innerHTML = '';
+    document.getElementById('participantBody').innerHTML = '';
+    const note = document.getElementById('participantNote');
+    if (note) note.style.display='none';
+    document.getElementById('participantBlock').classList.add('hidden');
+    document.getElementById('roMiniBlock').classList.add('hidden');
+
+    (function reinitDate(){
+      const dateInput = document.getElementById('eventDate');
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const minDate = new Date();
+      minDate.setDate(today.getDate() - 5);
+      const minDateStr = minDate.toISOString().split('T')[0];
+      dateInput.value = todayStr; dateInput.max = todayStr; dateInput.min = minDateStr;
+    })();
+
+    const team = document.getElementById('teamMember');
+    if (team) team.innerHTML = '<option value="">Select</option>';
+
+    document.querySelectorAll('.input-invalid').forEach(el=>{
+      el.classList.remove('input-invalid'); el.removeAttribute('aria-invalid');
+    });
+  }
+
+  function buildLocalGuardKey(participantsSig, photoSigs){
+    return (participantsSig + '|' + (photoSigs||[]).slice().sort().join('|')).toUpperCase();
+  }
+  function localDuplicateGuardSet(key){
+    const rec = { key, ts: Date.now() };
+    try { localStorage.setItem('activity_local_guard', JSON.stringify(rec)); } catch(e){}
+  }
+  function localDuplicateGuardHit(key){
+    try{
+      const rec = JSON.parse(localStorage.getItem('activity_local_guard') || 'null');
+      if (!rec) return false;
+      const within = (Date.now() - (rec.ts||0)) < 30*1000; // 30s
+      return within && rec.key === key;
+    }catch(e){ return false; }
+  }
+
+  function validateRoMini(){
+    const blk = document.getElementById('roMiniBlock');
+    if (blk.classList.contains('hidden')) return { ok:true };
+    const sap = document.getElementById('roMiniSap');
+    const nm  = document.getElementById('roMiniName');
+    const sapVal = (sap.value || '').replace(/\D/g,'').slice(0,6);
+    const nmVal  = (nm.value || '').trim();
+    sap.value = sapVal;
+
+    let ok = true, first = null;
+    if (!/^\d{6}$/.test(sapVal)) { sap.classList.add('input-invalid'); sap.setAttribute('aria-invalid','true'); ok = false; first = first || sap; }
+    if (!nmVal) { nm.classList.add('input-invalid'); nm.setAttribute('aria-invalid','true'); ok = false; first = first || nm; }
+    if (!ok){
+      if (first) { first.scrollIntoView({behavior:'smooth', block:'center'}); try{ first.focus({preventScroll:true}); }catch(e){} }
+      showToast('Please fill valid RO details (6-digit SAP & Name).', 'error', 4000);
+      return { ok:false };
+    }
+    sap.classList.remove('input-invalid'); sap.removeAttribute('aria-invalid');
+    nm.classList.remove('input-invalid'); nm.removeAttribute('aria-invalid');
+    return { ok:true };
+  }
+
+  /* ===== Submit ===== */
+  function submitForm(){
+    const btn = document.getElementById('submitBtn'); btn.disabled = true;
+
+    (async () => {
+      if (typeof google === 'undefined' || !google.script || !google.script.run){
+        showToast('Apps Script context not found. Open the deployed web app URL.', 'error', 4000);
+        btn.disabled = false; return;
+      }
+
+      const core = validateCoreFields();
+      if (!core.ok) { btn.disabled = false; return; }
+
+      const photoInput = document.getElementById('photos');
+      if (!photoInput.files || photoInput.files.length < 1) {
+        showToast('Please upload at least 1 photo before submitting.', 'error');
+        btn.disabled = false; return;
+      }
+      const fList = [...photoInput.files];
+      if (fList.length > 3) {
+        showToast('Maximum 3 photos allowed', 'error');
+        btn.disabled = false; return;
+      }
+
+      const v1 = validateParticipants60();
+      if (!v1.ok) { btn.disabled = false; return; }
+      const v2 = validateNoDuplicateRows();
+      if (!v2.ok) { btn.disabled = false; return; }
+
+      const roChk = validateRoMini();
+      if (!roChk.ok) { btn.disabled = false; return; }
+
+      const photoSigs = [];
+      for (let i=0; i<fList.length; i++) {
+        photoSigs.push(await sha256HexFromFile(fList[i]));
+      }
+      const participantsSig = await buildParticipantsSignature();
+
+      const guardKey = buildLocalGuardKey(participantsSig, photoSigs);
+      if (localDuplicateGuardHit(guardKey)) {
+        showToast('Duplicate detected: You recently submitted similar data. Please wait a few seconds.', 'error', 4000);
+        btn.disabled = false; return;
+      }
+
+      let watchdog = setTimeout(() => {
+        btn.disabled = false;
+        showToast('Request timed out. Please try again.', 'error', 4500);
+      }, 20000);
+
+      const crit = { photoSigs, participantsSig };
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res === true || (res && res.isDuplicate)) {
+            clearTimeout(watchdog);
+            const reason = (res && res.reason) || 'duplicate';
+            if (reason === 'participants') {
+              showToast('Duplicate blocked: Same participants list found within last 5 days.', 'error', 5000);
+            } else if (reason === 'photo') {
+              showToast('Duplicate blocked: Same photo already used (not allowed again).', 'error', 5000);
+            } else {
+              showToast('Duplicate blocked by server rules.', 'error', 5000);
+            }
+            btn.disabled = false; return;
+          }
+
+          const data = {};
+          document.querySelectorAll('input,select,textarea').forEach(e => { if (e.type !== 'file' && e.name) data[e.name] = e.value; });
+
+          // Participants columns as multiline (no numbering)
+          const nameVal = (document.getElementById('nameActivity').value || '').trim();
+          const cols = SCHEMA_BY_ACTIVITY[nameVal] || [];
+          if (cols.length){
+            const colBuffers = {}; cols.forEach(c => colBuffers[c] = '');
+            const trs = document.querySelectorAll('#participantBody tr');
+            trs.forEach(tr => {
+              const inp = tr.querySelectorAll('input');
+              cols.forEach((c, idx) => {
+                const raw = (inp[idx]?.value || '');
+                const val = (c.toLowerCase().includes('contact')) ? raw.replace(/\D/g,'').slice(0,10) : raw;
+                colBuffers[c] += `${val.trim()}\n`;
+              });
+            });
+            cols.forEach(c => {
+              const sheetKey = SHEET_HEADER_MAP[c] || c;
+              data[sheetKey] = (colBuffers[c] || '').trim();
+            });
+          }
+
+          // RO mini (if visible)
+          const roBlk = document.getElementById('roMiniBlock');
+          if (!roBlk.classList.contains('hidden')){
+            data['SAP CODE'] = (document.getElementById('roMiniSap').value || '').trim();
+            data['NAME OF RO'] = (document.getElementById('roMiniName').value || '').trim();
+          }
+
+          // Signatures
+          photoSigs.forEach((sig, i) => { data[`Photo Sig ${i+1}`] = sig; });
+          data['Participants Signature'] = participantsSig;
+
+          // Files → base64 array
+          const files = fList.map(f => new Promise(res => { const fr = new FileReader(); fr.onload = () => res({ name: f.name, type: f.type, data: fr.result.split(',')[1] }); fr.readAsDataURL(f); }));
+
+          Promise.all(files).then(fd => {
+            google.script.run
+              .withSuccessHandler(() => {
+                clearTimeout(watchdog);
+                showToast('Thanks!, ✅ Activity submitted successfully.', 'success', 2200);
+                localDuplicateGuardSet(guardKey);
+                setTimeout(() => { resetAll(); }, 400);
+                btn.disabled = false;
+              })
+              .withFailureHandler(e => {
+                clearTimeout(watchdog);
+                showToast('Sorry, submission failed: ' + (e?.message || 'Unknown error'), 'error');
+                btn.disabled = false;
+              })
+              .submitForm(data, fd);
+          });
+        })
+        .withFailureHandler(e => {
+          clearTimeout(watchdog);
+          showToast('Could not verify duplicates. Please try again later.', 'error', 4000);
+          btn.disabled = false;
+        })
+        .checkDuplicate(crit, 5);
+    })();
+  }
+
+  function loadLast(){
+    const btn = document.querySelector('button.secondary'); btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(obj => {
+        btn.disabled = false;
+        if (!obj) { showToast('No previous submission found', 'error'); return; }
+
+        document.querySelectorAll('input[name],select[name],textarea[name]').forEach(el => {
+          const key = el.name; if (obj[key] != null) el.value = obj[key];
+        });
+
+        onTypeChange(); onNameChange();
+
+        const nameVal = (document.getElementById('nameActivity').value || '').trim();
+        const cols = SCHEMA_BY_ACTIVITY[nameVal] || [];
+
+        const firstDisplayCol = cols[0];
+        const firstSheetKey = SHEET_HEADER_MAP[firstDisplayCol] || firstDisplayCol;
+        const count = firstSheetKey ? ((obj[firstSheetKey] || '').split(/\n/).filter(Boolean).length) : 0;
+        document.getElementById('nop').value = count;
+        buildParticipantTable();
+
+        if (count > 0 && cols.length) {
+          const arrays = {};
+          cols.forEach(c => {
+            const sheetKey = SHEET_HEADER_MAP[c] || c;
+            arrays[c] = (obj[sheetKey] || '').split(/\n/);
+          });
+
+          document.querySelectorAll('#participantBody tr').forEach((tr, i) => {
+            const inp = tr.querySelectorAll('input');
+            cols.forEach((c, idx) => {
+              const strip = s => (s || '').replace(/^\d+\)\s*/, '');
+              inp[idx].value = strip(arrays[c][i] || '');
+            });
+          });
+        }
+
+        updateRoMiniVisibility();
+        const roBlk = document.getElementById('roMiniBlock');
+        if (!roBlk.classList.contains('hidden')){
+          const sap = document.getElementById('roMiniSap');
+          const nm  = document.getElementById('roMiniName');
+          sap.value = (obj['SAP CODE'] || '').replace(/\D/g,'').slice(0,6);
+          nm.value  = obj['NAME OF RO'] || '';
+        }
+      })
+      .withFailureHandler(e => { btn.disabled = false; showToast(e?.message || 'Failed to load last submission', 'error'); })
+      .getLastSubmission();
+  }
+
+  /* ========= VIEW ACTIVITIES ========= */
+  function closeActivitiesModal(){
+    const m = document.getElementById('activitiesModal');
+    if (m) m.classList.add('hidden');
+  }
+
+  function showActivitiesLoading_(titleText){
+    const m = document.getElementById('activitiesModal');
+    const body = document.getElementById('activitiesBody');
+    const ttl = document.getElementById('activitiesTitle');
+    if (ttl) ttl.textContent = titleText || 'My Activities';
+    if (body) body.innerHTML = `
+      <div class="activities-toolbar">
+        <span class="badge">Loading…</span>
+        <span class="activities-count">Please wait</span>
+      </div>
+      <div class="activities-table-wrap">
+        <table class="activities-table">
+          <thead>
+            <tr><th>Date</th><th>FSO</th><th>CRE</th><th>Type</th><th>Name</th><th>Participants</th><th>Files</th></tr>
+          </thead>
+          <tbody>
+            ${Array.from({length:5}).map(() => `
+              <tr>
+                <td><div class="skeleton" style="width:90px;"></div></td>
+                <td><div class="skeleton" style="width:120px;"></div></td>
+                <td><div class="skeleton" style="width:140px;"></div></td>
+                <td><div class="skeleton" style="width:160px;"></div></td>
+                <td><div class="skeleton" style="width:180px;"></div></td>
+                <td><div class="skeleton" style="width:60px;"></div></td>
+                <td><div class="skeleton" style="width:60px;"></div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    if (m) m.classList.remove('hidden');
+  }
+
+  function renderActivities_(list, titleText){
+    const m = document.getElementById('activitiesModal');
+    const body = document.getElementById('activitiesBody');
+    const ttl = document.getElementById('activitiesTitle');
+    if (ttl) ttl.textContent = titleText || 'My Activities';
+
+    if (!list || !list.length) {
+      body.innerHTML = `
+        <div class="activities-toolbar">
+          <span class="badge">0 records</span>
+          <span class="activities-count">We are working on this feature and it will be enabled shortly.</span>
+        </div>
+      `;
+      if (m) m.classList.remove('hidden');
+      return;
+    }
+
+    const rows = list.map(r => {
+      const dt  = escapeHtml_(r['Date of Event'] || r['Timestamp'] || '');
+      const fso = escapeHtml_(r['FSO LOCATION'] || '');
+      const cre = escapeHtml_(r['CRE ID & Name'] || '');
+      const typ = escapeHtml_(r['Type of Activity'] || '');
+      const nam = escapeHtml_(r['Name of Activity'] || '');
+      const nop = escapeHtml_(r['Nos. of Participants'] || '');
+      const files = (r['File IDs'] || '').split(',').filter(Boolean).length;
+
+      return `
+        <tr>
+          <td>${dt}</td>
+          <td>${fso}</td>
+          <td>${cre}</td>
+          <td>${typ}</td>
+          <td>${nam}</td>
+          <td style="text-align:right;">${nop}</td>
+          <td style="text-align:right;">${files}</td>
+        </tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="activities-toolbar">
+        <span class="badge">${list.length} record(s)</span>
+        <span class="activities-count">Sorted by most recent</span>
+      </div>
+      <div class="activities-table-wrap">
+        <table class="activities-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>FSO</th>
+              <th>CRE</th>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Participants</th>
+              <th>Files</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+
+    if (m) m.classList.remove('hidden');
+  }
+
+  function escapeHtml_(s){
+    return String(s || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function loadMyActivities(period){
+    const label = period === 'YEAR' ? 'This Year' : 'Current Month';
+    const title = `My Activities – ${label}`;
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run){
+      showToast('Apps Script not available. Open the deployed web app URL.', 'error', 4000);
+      return;
+    }
+
+    showActivitiesLoading_(title);
+
+    google.script.run
+      .withSuccessHandler(res => {
+        try {
+          const list = Array.isArray(res) ? res.slice() : [];
+          list.sort((a,b) => {
+            const at = new Date(a.Timestamp || a['Date of Event'] || 0).getTime();
+            const bt = new Date(b.Timestamp || b['Date of Event'] || 0).getTime();
+            return bt - at;
+          });
+          renderActivities_(list, title);
+        } catch(e) {
+          closeActivitiesModal();
+          showToast('Failed to render activities.', 'error', 3500);
+        }
+      })
+      .withFailureHandler(e => {
+        closeActivitiesModal();
+        showToast(e?.message || 'Failed to load activities', 'error', 4000);
+      })
+      .getMyActivities(period);
+  }
+
+  // ===== Boot =====
+  // IMPORTANT: Ensure locations populate and change handler exists
+  populateLocations();
+  // Extra safety: add event listener as fallback (even if inline attribute is changed)
+  const _fsoSel = document.getElementById('fsoLocation');
+  if (_fsoSel) _fsoSel.addEventListener('change', loadTeam);
+
+  onTypeChange();
+  updateParticipantVisibility();
+  updateRoMiniVisibility();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+
+</script>
+</body>
+</html>
