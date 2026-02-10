@@ -1,6 +1,6 @@
 {
   "name": "Activity Reporting",
-  "short_name": "Activity App",
+  "short_name": "NARMS",
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#0b63ce",
@@ -18,3 +18,4 @@
     }
   ]
 }
+
