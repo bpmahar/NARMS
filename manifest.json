@@ -1,6 +1,6 @@
 {
-  "name": "N_ARMS",
-  "short_name": "N_ARMS",
+  "name": "NARMS - North Activity Reporting Management System",
+  "short_name": "NARMS",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -18,3 +18,4 @@
     }
   ]
 }
+
