@@ -1,5 +1,5 @@
 {
-  "name": "Activity Reporting",
+  "name": "NARMS",
   "short_name": "NARMS",
   "start_url": ".",
   "display": "standalone",
@@ -18,4 +18,5 @@
     }
   ]
 }
+
 
